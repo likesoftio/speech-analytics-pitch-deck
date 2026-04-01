@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Речевая аналитика для стоматологий</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0A0A0F;
+    --bg2: #0F0F1A;
+    --bg3: #14141F;
+    --accent: #10B981;
+    --accent2: #34D399;
+    --accent3: #059669;
+    --red: #EF4444;
+    --red2: #FCA5A5;
+    --text: #F0F0F5;
+    --text2: #A0A0B5;
+    --border: rgba(16, 185, 129, 0.2);
+    --border-red: rgba(239, 68, 68, 0.25);
+    --glow: rgba(16, 185, 129, 0.12);
+    --slide-w: 1280px;
+    --slide-h: 720px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    user-select: none;
+  }
+
+  /* ── Controls bar ── */
+  #controls {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 52px;
+    background: rgba(10, 10, 15, 0.95);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    z-index: 100;
+    backdrop-filter: blur(8px);
+  }
+  .ctrl-btn {
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  .ctrl-btn:hover { background: rgba(16, 185, 129, 0.25); border-color: var(--accent2); }
+  #slide-counter { color: var(--text2); font-size: 13px; min-width: 60px; text-align: center; }
+
+  /* ── Deck & scaler ── */
+  #deck {
+    width: 100vw;
+    height: calc(100vh - 52px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  #scaler {
+    width: var(--slide-w);
+    height: var(--slide-h);
+    position: relative;
+    transform-origin: center center;
+  }
+
+  /* ── Slides ── */
+  .slide {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    display: none;
+    background: var(--bg);
+    overflow: hidden;
+  }
+  .slide.active { display: flex; flex-direction: column; }
+
+  /* grid bg */
+  .slide::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(16,185,129,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(16,185,129,0.035) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+  }
+
+  /* orbs */
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+  }
+  .orb-1 { width: 500px; height: 500px; background: rgba(16,185,129,0.14); top: -120px; right: -100px; }
+  .orb-2 { width: 350px; height: 350px; background: rgba(124,58,237,0.07); bottom: -80px; left: -60px; }
+  .orb-red { background: rgba(239,68,68,0.14) !important; }
+
+  /* ── Shared header ── */
+  .slide-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 72px;
+    border-bottom: 1px solid rgba(16,185,129,0.1);
+    flex-shrink: 0;
+    position: relative; z-index: 1;
+  }
+  .logo-mark {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 700; color: var(--text2);
+  }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .slide-num {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--accent2); opacity: 0.7;
+  }
+
+  /* ── Tags ── */
+  .tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .tag-green  { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.35); color: #6EE7B7; }
+  .tag-red    { background: rgba(239,68,68,0.12);  border: 1px solid rgba(239,68,68,0.3);   color: #FCA5A5; }
+  .tag-blue   { background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3);  color: #93C5FD; }
+  .tag-purple { background: rgba(124,58,237,0.18); border: 1px solid rgba(124,58,237,0.35); color: #C4B5FD; }
+
+  /* ── Typography ── */
+  h1.hero { font-size: 62px; font-weight: 900; line-height: 1.08; letter-spacing: -0.03em; }
+  h1.hero span { color: var(--accent2); }
+  h2.slide-title { font-size: 42px; font-weight: 800; line-height: 1.15; letter-spacing: -0.02em; }
+  h2.slide-title span { color: var(--accent2); }
+  h3.section-head { font-size: 18px; font-weight: 700; color: var(--text); }
+  p.lead { font-size: 19px; font-weight: 400; line-height: 1.6; color: var(--text2); }
+  p.body { font-size: 14px; line-height: 1.65; color: var(--text2); }
+
+  /* ── Layout ── */
+  .pad { padding: 48px 72px; }
+  .pad-sm { padding: 32px 72px; }
+  .row { display: flex; gap: 40px; }
+  .col { flex: 1; }
+  .mt-8  { margin-top: 8px; }
+  .mt-16 { margin-top: 16px; }
+  .mt-24 { margin-top: 24px; }
+  .mt-32 { margin-top: 32px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+
+  /* ── Problem items ── */
+  .problem-item {
+    display: flex; gap: 16px;
+    padding: 18px 22px;
+    background: var(--bg2);
+    border: 1px solid var(--border-red);
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+  .problem-icon {
+    width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
+    background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3);
+    display: flex; align-items: center; justify-content: center; font-size: 15px;
+  }
+
+  /* ── Solution cards ── */
+  .solution-card {
+    flex: 1;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px 22px;
+    position: relative; overflow: hidden;
+  }
+  .solution-card::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+    background: var(--accent);
+  }
+  .solution-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: rgba(16,185,129,0.18); border: 1px solid rgba(16,185,129,0.35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; margin-bottom: 14px;
+  }
+  .solution-metric { font-size: 26px; font-weight: 800; color: var(--accent2); margin-bottom: 4px; }
+
+  /* ── Steps ── */
+  .step-item {
+    display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px;
+  }
+  .step-circle {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--accent); color: #000;
+    font-weight: 800; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 2px;
+  }
+
+  /* ── Stat boxes ── */
+  .stat-box {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px;
+  }
+  .stat-val { font-size: 30px; font-weight: 900; color: var(--accent2); }
+  .stat-val.red { color: var(--red2); }
+  .stat-lbl { font-size: 12px; color: var(--text2); margin-top: 4px; line-height: 1.4; }
+
+  /* ── Get items (what you get) ── */
+  .get-item {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 20px; margin-bottom: 10px;
+  }
+  .get-icon {
+    width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
+    background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3);
+    display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+
+  /* ── Pricing ── */
+  .pricing-col {
+    flex: 1;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 28px 24px; text-align: center;
+    position: relative; overflow: hidden;
+  }
+  .pricing-col.featured { border-color: var(--accent); background: rgba(16,185,129,0.08); }
+  .pricing-col.featured::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--accent);
+  }
+  .price-label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.08em; }
+  .price-name  { font-size: 18px; font-weight: 700; color: var(--text); margin: 8px 0 4px; }
+  .price-value { font-size: 38px; font-weight: 900; color: var(--accent2); margin: 8px 0 2px; }
+  .price-sub   { font-size: 13px; color: var(--text2); margin-bottom: 18px; }
+  .price-divider { height: 1px; background: var(--border); margin: 14px 0; }
+  .price-feature { font-size: 13px; color: var(--text2); margin: 7px 0; text-align: left; display: flex; gap: 8px; }
+  .price-feature::before { content: "✓"; color: var(--accent2); font-weight: 700; flex-shrink: 0; }
+
+  /* ── CTA button ── */
+  .cta-btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 16px 36px;
+    background: var(--accent); color: #000;
+    font-family: inherit; font-size: 15px; font-weight: 700;
+    border: none; border-radius: 10px; cursor: pointer;
+    text-decoration: none; letter-spacing: 0.02em;
+    transition: all 0.2s;
+  }
+  .cta-btn:hover { background: var(--accent2); transform: translateY(-1px); }
+
+  /* print */
+  @media print {
+    body { overflow: visible; height: auto; }
+    #controls { display: none; }
+    #deck { height: auto; overflow: visible; }
+    #scaler { transform: none !important; position: relative; }
+    .slide { position: relative; display: flex !important; page-break-after: always; height: var(--slide-h); }
+  }
+</style>
+</head>
+<body>
+
+<div id="deck">
+<div id="scaler">
+
+<!-- ═══ SLIDE 1: COVER ═══ -->
+<section class="slide active" id="slide-1">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <!-- Waveform SVG decoration -->
+  <svg style="position:absolute;right:52px;top:50%;transform:translateY(-50%);opacity:0.55;width:380px;height:320px" viewBox="0 0 380 320" fill="none">
+    <!-- Concentric arcs suggesting sound waves / speech -->
+    <path d="M190 160 Q230 100 270 160 Q230 220 190 160Z" fill="rgba(16,185,129,0.2)" stroke="rgba(16,185,129,0.5)" stroke-width="1"/>
+    <path d="M190 160 Q250 80 310 160 Q250 240 190 160Z" fill="none" stroke="rgba(16,185,129,0.3)" stroke-width="1" stroke-dasharray="5 4"/>
+    <path d="M190 160 Q270 60 350 160 Q270 260 190 160Z" fill="none" stroke="rgba(16,185,129,0.18)" stroke-width="1" stroke-dasharray="5 4"/>
+    <!-- Microphone icon center -->
+    <rect x="178" y="130" width="24" height="38" rx="12" fill="rgba(16,185,129,0.6)" stroke="#10B981" stroke-width="1.5"/>
+    <path d="M165 165 Q165 190 190 190 Q215 190 215 165" stroke="#34D399" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <line x1="190" y1="190" x2="190" y2="205" stroke="#34D399" stroke-width="2" stroke-linecap="round"/>
+    <line x1="180" y1="205" x2="200" y2="205" stroke="#34D399" stroke-width="2" stroke-linecap="round"/>
+    <!-- Animated waveform lines -->
+    <line x1="80" y1="130" x2="80" y2="190" stroke="rgba(16,185,129,0.4)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="95" y1="110" x2="95" y2="210" stroke="rgba(16,185,129,0.5)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="110" y1="125" x2="110" y2="195" stroke="rgba(16,185,129,0.4)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="125" y1="140" x2="125" y2="180" stroke="rgba(16,185,129,0.3)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="255" y1="140" x2="255" y2="180" stroke="rgba(16,185,129,0.3)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="270" y1="125" x2="270" y2="195" stroke="rgba(16,185,129,0.4)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="285" y1="110" x2="285" y2="210" stroke="rgba(16,185,129,0.5)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="300" y1="130" x2="300" y2="190" stroke="rgba(16,185,129,0.4)" stroke-width="2" stroke-linecap="round"/>
+    <!-- Floating labels -->
+    <text x="85" y="105" fill="rgba(110,231,183,0.7)" font-size="9" font-family="Inter,sans-serif" font-weight="600">Транскрипция</text>
+    <text x="250" y="105" fill="rgba(110,231,183,0.7)" font-size="9" font-family="Inter,sans-serif" font-weight="600">AI-анализ</text>
+    <text x="145" y="240" fill="rgba(110,231,183,0.7)" font-size="9" font-family="Inter,sans-serif" font-weight="600">Отчёт в ₽</text>
+    <!-- ₽ loss indicator -->
+    <circle cx="190" cy="265" r="18" fill="rgba(239,68,68,0.2)" stroke="rgba(239,68,68,0.5)" stroke-width="1"/>
+    <text x="190" y="270" text-anchor="middle" fill="#FCA5A5" font-size="11" font-weight="700" font-family="Inter,sans-serif">−₽</text>
+  </svg>
+
+  <div class="pad" style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:1;max-width:640px">
+    <div style="margin-bottom:20px">
+      <div class="logo-mark">
+        <div class="logo-dot"></div>
+        <span>Речевая аналитика</span>
+      </div>
+    </div>
+    <span class="tag tag-red" style="margin-bottom:16px;align-self:flex-start">Для стоматологий</span>
+    <h1 class="hero">Вы теряете<br>пациентов.<br><span>Мы покажем — где.</span></h1>
+    <p class="lead mt-24" style="max-width:480px">Бесплатный AI-аудит звонков: найдём потери, покажем деньги, дадим конкретный план</p>
+    <div style="display:flex;gap:10px;margin-top:28px;flex-wrap:wrap">
+      <span class="tag tag-green">AI-аудит</span>
+      <span class="tag tag-blue">Транскрипция</span>
+      <span class="tag tag-red">Потери в ₽</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SLIDE 2: PROBLEM ═══ -->
+<section class="slide" id="slide-2">
+  <div class="orb orb-1 orb-red"></div>
+  <div class="orb orb-2"></div>
+  <div class="slide-header">
+    <div class="logo-mark"><div class="logo-dot"></div><span>Речевая аналитика</span></div>
+    <span class="slide-num">Проблема</span>
+  </div>
+
+  <div class="pad-sm" style="flex:1;display:flex;gap:48px;align-items:center;position:relative;z-index:1">
+    <div style="flex:1.1">
+      <h2 class="slide-title">Звонки — главная<br>точка потерь<br><span>в клинике</span></h2>
+      <div style="margin-top:28px">
+        <div class="problem-item">
+          <div class="problem-icon">📵</div>
+          <div>
+            <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:3px">Пропущенные звонки</div>
+            <div class="body">Пациент позвонил — никто не взял. Ушёл к конкурентам без второго шанса.</div>
+          </div>
+        </div>
+        <div class="problem-item">
+          <div class="problem-icon">😐</div>
+          <div>
+            <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:3px">Слабый скрипт</div>
+            <div class="body">"Записаться можно" вместо "запишу вас на завтра в 14:00" — теряем на каждом звонке.</div>
+          </div>
+        </div>
+        <div class="problem-item">
+          <div class="problem-icon">🔕</div>
+          <div>
+            <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:3px">Нет перезвонов</div>
+            <div class="body">Обещали перезвонить — не перезвонили. Пациент забыл. Деньги потеряны.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:0.85;display:flex;flex-direction:column;gap:14px">
+      <div class="stat-box" style="text-align:center;border-color:var(--border-red)">
+        <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Типичная клиника теряет</div>
+        <div class="stat-val red" style="font-size:52px">20–40%</div>
+        <div class="stat-lbl">выручки из-за плохой обработки звонков</div>
+      </div>
+      <div class="stat-box" style="text-align:center">
+        <div class="stat-val" style="font-size:38px">~405k ₽</div>
+        <div class="stat-lbl">упущенной выручки в месяц<br>при 200 звонках / 55% конверсии</div>
+      </div>
+      <div class="stat-box" style="text-align:center;background:rgba(239,68,68,0.05);border-color:var(--border-red)">
+        <div class="stat-val red" style="font-size:28px">Вы видите это?</div>
+        <div class="stat-lbl" style="margin-top:6px">В большинстве клиник — нет.<br>Вот почему мы существуем.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SLIDE 3: SOLUTION ═══ -->
+<section class="slide" id="slide-3">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="slide-header">
+    <div class="logo-mark"><div class="logo-dot"></div><span>Речевая аналитика</span></div>
+    <span class="slide-num">Решение</span>
+  </div>
+
+  <div class="pad-sm" style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:1">
+    <h2 class="slide-title">AI-аудит: <span>видим каждый<br>потерянный рубль</span></h2>
+    <p class="body mt-8" style="font-size:15px">Мы не продаём «AI». Мы находим конкретные потери и показываем, как их устранить.</p>
+
+    <div class="row mt-24" style="gap:16px">
+      <div class="solution-card">
+        <div class="solution-icon">🎙️</div>
+        <h3 class="section-head">Транскрипция</h3>
+        <p class="body mt-8">Переводим все записи звонков в текст — точно и быстро, любой формат аудио</p>
+        <div class="solution-metric mt-16">100%</div>
+        <div style="font-size:12px;color:var(--text2)">звонков под анализом</div>
+      </div>
+
+      <div class="solution-card" style="border-bottom-color:#3B82F6">
+        <div class="solution-icon" style="background:rgba(59,130,246,0.18);border-color:rgba(59,130,246,0.35)">🤖</div>
+        <h3 class="section-head">AI-анализ</h3>
+        <p class="body mt-8">Оцениваем каждый звонок: исход, ошибки администратора, причины потерь</p>
+        <div class="solution-metric mt-16" style="color:#93C5FD">2–3 дня</div>
+        <div style="font-size:12px;color:var(--text2)">с момента получения записей</div>
+      </div>
+
+      <div class="solution-card">
+        <div class="solution-icon">📊</div>
+        <h3 class="section-head">Отчёт в деньгах</h3>
+        <p class="body mt-8">Не абстрактные «рекомендации» — конкретные потери в ₽ и план исправления</p>
+        <div class="solution-metric mt-16">В ₽</div>
+        <div style="font-size:12px;color:var(--text2)">потенциал роста под каждым пунктом</div>
+      </div>
+
+      <div class="solution-card">
+        <div class="solution-icon">📞</div>
+        <h3 class="section-head">Созвон-разбор</h3>
+        <p class="body mt-8">45 минут: разбираем отчёт вместе, отвечаем на вопросы, даём конкретный план</p>
+        <div class="solution-metric mt-16">45 мин</div>
+        <div style="font-size:12px;color:var(--text2)">с экспертом по звонкам</div>
+      </div>
+    </div>
+
+    <div class="card mt-24" style="display:flex;align-items:center;gap:20px;background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.25)">
+      <div style="font-size:24px">💡</div>
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--accent2)">Мы не продаём технологию — мы показываем деньги</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:3px">Клиент видит конкретные потери ещё до принятия решения о платном формате</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SLIDE 4: HOW IT WORKS ═══ -->
+<section class="slide" id="slide-4">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="slide-header">
+    <div class="logo-mark"><div class="logo-dot"></div><span>Речевая аналитика</span></div>
+    <span class="slide-num">Как работает</span>
+  </div>
+
+  <div class="pad-sm" style="flex:1;display:flex;gap:60px;align-items:center;position:relative;z-index:1">
+    <div style="flex:1">
+      <h2 class="slide-title">3 шага —<br>и вы знаете,<br>где <span>теряете деньги</span></h2>
+
+      <div style="margin-top:32px">
+        <div class="step-item">
+          <div class="step-circle">1</div>
+          <div>
+            <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">Передаёте записи</div>
+            <div class="body">20–50 записей звонков за последний месяц. Любой формат — мы принимаем всё.</div>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-circle">2</div>
+          <div>
+            <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">Мы анализируем</div>
+            <div class="body">Транскрипция + AI-оценка каждого звонка по 8 параметрам. Занимает 2–3 рабочих дня.</div>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-circle">3</div>
+          <div>
+            <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px">Получаете отчёт + созвон</div>
+            <div class="body">Детальный PDF с потерями в ₽, топ-5 причин, примеры звонков и план исправления. Разбираем вместе.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:0.9;display:flex;flex-direction:column;gap:14px">
+      <div style="font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text2);margin-bottom:4px">Что в отчёте</div>
+      <div class="get-item">
+        <div class="get-icon">📈</div>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:2px">Текущая конверсия</div>
+          <div class="body">Сколько из позвонивших реально записались — в числах и %</div>
+        </div>
+      </div>
+      <div class="get-item">
+        <div class="get-icon">🔍</div>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:2px">Топ-5 причин потерь</div>
+          <div class="body">Где конкретно уходят пациенты — с примерами из ваших звонков</div>
+        </div>
+      </div>
+      <div class="get-item">
+        <div class="get-icon">💬</div>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:2px">Реальные цитаты</div>
+          <div class="body">3–5 ярких примеров с разбором — что именно пошло не так</div>
+        </div>
+      </div>
+      <div class="get-item" style="border-color:rgba(16,185,129,0.35);background:rgba(16,185,129,0.05)">
+        <div class="get-icon">💰</div>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:var(--accent2);margin-bottom:2px">Потенциал роста в ₽</div>
+          <div class="body">Сколько дополнительно можно зарабатывать при устранении каждой проблемы</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SLIDE 5: EXAMPLE ═══ -->
+<section class="slide" id="slide-5">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="slide-header">
+    <div class="logo-mark"><div class="logo-dot"></div><span>Речевая аналитика</span></div>
+    <span class="slide-num">Пример расчёта</span>
+  </div>
+
+  <div class="pad-sm" style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:1">
+    <h2 class="slide-title">Реальные цифры<br>для <span>типичной клиники</span></h2>
+
+    <div class="row mt-24" style="gap:16px;align-items:stretch">
+      <div class="stat-box" style="text-align:center;flex:1">
+        <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Входящих в месяц</div>
+        <div class="stat-val" style="font-size:48px">200</div>
+        <div class="stat-lbl">звонков</div>
+      </div>
+      <div class="stat-box" style="text-align:center;flex:1">
+        <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Конверсия сейчас</div>
+        <div class="stat-val red" style="font-size:48px">55%</div>
+        <div class="stat-lbl">110 записей из 200</div>
+      </div>
+      <div class="stat-box" style="text-align:center;flex:1">
+        <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Средний чек</div>
+        <div class="stat-val" style="font-size:40px">4 500 ₽</div>
+        <div class="stat-lbl">первичный пациент</div>
+      </div>
+    </div>
+
+    <div class="row mt-16" style="gap:16px">
+      <div class="stat-box" style="flex:1;border-color:var(--border-red);background:rgba(239,68,68,0.05)">
+        <div style="font-size:11px;font-weight:600;color:#FCA5A5;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Теряете в месяц</div>
+        <div class="stat-val red" style="font-size:40px">90 пациентов</div>
+        <div class="stat-lbl">= <strong style="color:#FCA5A5">405 000 ₽</strong> упущенной выручки ежемесячно</div>
+      </div>
+      <div class="stat-box" style="flex:1;border-color:rgba(16,185,129,0.35);background:rgba(16,185,129,0.06)">
+        <div style="font-size:11px;font-weight:600;color:var(--accent2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">Потенциал при +20% конверсии</div>
+        <div class="stat-val" style="font-size:40px">+162 000 ₽</div>
+        <div class="stat-lbl">только на входящих звонках / месяц</div>
+      </div>
+      <div class="stat-box" style="flex:1;text-align:center">
+        <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px">ROI от аудита</div>
+        <div class="stat-val" style="font-size:40px">∞</div>
+        <div class="stat-lbl">пилот — <strong style="color:var(--accent2)">бесплатно</strong><br>платный формат от 30k ₽/мес</div>
+      </div>
+    </div>
+
+    <div class="card mt-16" style="display:flex;align-items:center;gap:20px;background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.25)">
+      <div style="font-size:22px">📊</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.6">
+        <strong style="color:var(--text)">Это консервативный расчёт.</strong> Реальный эффект выше — мы ещё не считаем повторные визиты, рекомендации и LTV пациента.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SLIDE 6: PRICING ═══ -->
+<section class="slide" id="slide-6">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="slide-header">
+    <div class="logo-mark"><div class="logo-dot"></div><span>Речевая аналитика</span></div>
+    <span class="slide-num">Форматы работы</span>
+  </div>
+
+  <div class="pad-sm" style="flex:1;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:1">
+    <h2 class="slide-title">Начните бесплатно,<br><span>масштабируйтесь по результату</span></h2>
+
+    <div class="row mt-28" style="gap:16px;align-items:stretch">
+      <div class="pricing-col">
+        <div class="price-label">Старт</div>
+        <div class="price-name">Пилотный аудит</div>
+        <div class="price-value">Бесплатно</div>
+        <div class="price-sub">разовый аудит</div>
+        <div class="price-divider"></div>
+        <div class="price-feature">Анализ 20–50 звонков</div>
+        <div class="price-feature">Полный отчёт с потерями в ₽</div>
+        <div class="price-feature">45-мин созвон-разбор</div>
+        <div class="price-feature">Конкретный план действий</div>
+      </div>
+
+      <div class="pricing-col featured">
+        <div class="price-label" style="color:var(--accent2)">Регулярно</div>
+        <div class="price-name">Постоянный мониторинг</div>
+        <div class="price-value">30–50k ₽</div>
+        <div class="price-sub">в месяц</div>
+        <div class="price-divider"></div>
+        <div class="price-feature">Ежемесячный аудит всех звонков</div>
+        <div class="price-feature">Динамика — видите прогресс</div>
+        <div class="price-feature">Оценка и корректировка скриптов</div>
+        <div class="price-feature">Приоритетная поддержка</div>
+        <div style="margin-top:14px;text-align:center">
+          <span class="tag tag-green" style="font-size:10px">Рекомендуем</span>
+        </div>
+      </div>
+
+      <div class="pricing-col">
+        <div class="price-label">Максимум</div>
+        <div class="price-name">Премиум</div>
+        <div class="price-value">100k+ ₽</div>
+        <div class="price-sub">в месяц</div>
+        <div class="price-divider"></div>
+        <div class="price-feature">Неограниченный объём звонков</div>
+        <div class="price-feature">Обучение администраторов</div>
+        <div class="price-feature">Разработка скриптов под вас</div>
+        <div class="price-feature">Выделенный эксперт</div>
+      </div>
+    </div>
+
+    <div class="card mt-20" style="display:flex;align-items:center;gap:20px;background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.25)">
+      <div style="font-size:22px">⚡</div>
+      <div style="font-size:13px;color:var(--text2)">
+        <strong style="color:var(--text)">Нет обязательств после пилота.</strong> Клиенты переходят на платный формат, потому что видят ROI — не потому что подписали контракт.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SLIDE 7: WHY US ═══ -->
+<section class="slide" id="slide-7">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="slide-header">
+    <div class="logo-mark"><div class="logo-dot"></div><span>Речевая аналитика</span></div>
+    <span class="slide-num">Почему мы</span>
+  </div>
+
+  <div class="pad-sm" style="flex:1;display:flex;gap:48px;align-items:center;position:relative;z-index:1">
+    <div style="flex:1.1">
+      <h2 class="slide-title">Мы не консалтинг.<br>Мы <span>показываем деньги</span><br>на ваших данных.</h2>
+
+      <div style="margin-top:28px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="width:22px;height:22px;border-radius:50%;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:#10B981;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px">✓</div>
+          <div style="font-size:14px;color:var(--text2)"><strong style="color:var(--text)">Конкретно, не абстрактно</strong> — каждая рекомендация привязана к реальным звонкам и рублям</div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="width:22px;height:22px;border-radius:50%;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:#10B981;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px">✓</div>
+          <div style="font-size:14px;color:var(--text2)"><strong style="color:var(--text)">Без теории</strong> — "покажу на ваших данных, без абстракций" — ответ на любое возражение</div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="width:22px;height:22px;border-radius:50%;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:#10B981;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px">✓</div>
+          <div style="font-size:14px;color:var(--text2)"><strong style="color:var(--text)">Быстро</strong> — 2–3 дня от получения записей до готового отчёта в руках</div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="width:22px;height:22px;border-radius:50%;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:#10B981;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px">✓</div>
+          <div style="font-size:14px;color:var(--text2)"><strong style="color:var(--text)">Нишевая экспертиза</strong> — работаем только со стоматологиями и клиниками в РФ</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:0.85;display:flex;flex-direction:column;gap:14px">
+      <div class="card" style="text-align:center">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:10px">Типичный результат после 1 месяца</div>
+        <div style="display:flex;gap:12px;justify-content:center">
+          <div style="text-align:center">
+            <div style="font-size:32px;font-weight:900;color:var(--accent2)">+18%</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px">конверсия</div>
+          </div>
+          <div style="width:1px;background:var(--border);margin:4px 8px"></div>
+          <div style="text-align:center">
+            <div style="font-size:32px;font-weight:900;color:var(--accent2)">−35%</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px">пропущенных</div>
+          </div>
+          <div style="width:1px;background:var(--border);margin:4px 8px"></div>
+          <div style="text-align:center">
+            <div style="font-size:32px;font-weight:900;color:var(--accent2)">×6</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:4px">ROI</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.3)">
+        <div style="font-size:13px;color:var(--text2);line-height:1.65;font-style:italic">
+          "Мы думали, что у нас всё в порядке с администраторами. Оказалось — теряли 40% записей только из-за одной фразы в скрипте."
+        </div>
+        <div style="font-size:12px;color:var(--accent2);margin-top:10px;font-weight:600">— Типичный фидбек после пилота</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ SLIDE 8: CTA ═══ -->
+<section class="slide" id="slide-8">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="slide-header">
+    <div class="logo-mark"><div class="logo-dot"></div><span>Речевая аналитика</span></div>
+    <span class="slide-num">Следующий шаг</span>
+  </div>
+
+  <div class="pad-sm" style="flex:1;display:flex;gap:60px;align-items:center;position:relative;z-index:1">
+    <div style="flex:1.1">
+      <h2 class="slide-title">Узнайте, сколько вы<br><span>теряете прямо сейчас</span></h2>
+      <p class="lead mt-16" style="font-size:17px">Всего три действия — и вы получите отчёт с конкретными цифрами потерь.</p>
+
+      <div style="margin-top:28px">
+        <div class="step-item">
+          <div class="step-circle">1</div>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:3px">Оставьте записи звонков</div>
+            <div class="body">20–50 звонков за последний месяц в любом формате</div>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-circle">2</div>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:3px">Получите отчёт через 2–3 дня</div>
+            <div class="body">Детальный PDF с потерями в ₽, примерами и рекомендациями</div>
+          </div>
+        </div>
+        <div class="step-item">
+          <div class="step-circle">3</div>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:3px">Созвон-разбор 45 минут</div>
+            <div class="body">Разбираем вместе, выстраиваем план — ничего не стоит</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:0.85;display:flex;flex-direction:column;align-items:center;gap:16px">
+      <div class="card" style="width:100%;text-align:center;background:linear-gradient(135deg,rgba(16,185,129,0.18),rgba(16,185,129,0.05));border-color:rgba(16,185,129,0.5)">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:16px">Начать бесплатный аудит</div>
+        <div style="font-size:28px;font-weight:900;color:var(--accent2);margin-bottom:4px">Бесплатно</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:20px">никаких обязательств</div>
+        <a class="cta-btn" href="mailto:hello@ai.agency" style="display:inline-flex;justify-content:center;width:100%">
+          Оставить записи →
+        </a>
+        <div style="margin-top:14px;font-size:12px;color:var(--text2)">hello@ai.agency</div>
+      </div>
+
+      <div class="card" style="width:100%;background:rgba(239,68,68,0.06);border-color:var(--border-red)">
+        <div style="font-size:12px;font-weight:600;color:#FCA5A5;text-align:center;margin-bottom:8px">Ограниченный набор</div>
+        <div style="font-size:13px;color:var(--text2);text-align:center;line-height:1.5">
+          Берём в пилот <strong style="color:var(--text)">не более 5 клиник</strong> одновременно.<br>
+          Чтобы гарантировать качество каждого аудита.
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+        <span class="tag tag-green">AI-анализ</span>
+        <span class="tag tag-blue">Транскрипция</span>
+        <span class="tag tag-purple">Отчёт в ₽</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /scaler -->
+</div><!-- /deck -->
+
+<!-- ══════════ CONTROLS ══════════ -->
+<div id="controls">
+  <button class="ctrl-btn" id="prev-btn">← Пред</button>
+  <span id="slide-counter">1 / 8</span>
+  <button class="ctrl-btn" id="next-btn">След →</button>
+  <div style="width:1px;height:24px;background:var(--border);margin:0 8px"></div>
+  <button class="ctrl-btn" onclick="window.print()">⬇ PDF</button>
+</div>
+
+<script>
+(function() {
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  let current = 0;
+
+  function scaleSlides() {
+    const scaler = document.getElementById('scaler');
+    const deck = document.getElementById('deck');
+    const W = 1280, H = 720;
+    const scale = Math.min(deck.clientWidth / W, deck.clientHeight / H);
+    scaler.style.transform = `scale(${scale})`;
+  }
+
+  function showSlide(n) {
+    slides[current].classList.remove('active');
+    current = (n + slides.length) % slides.length;
+    slides[current].classList.add('active');
+    document.getElementById('slide-counter').textContent = `${current + 1} / ${slides.length}`;
+  }
+
+  document.getElementById('prev-btn').addEventListener('click', () => showSlide(current - 1));
+  document.getElementById('next-btn').addEventListener('click', () => showSlide(current + 1));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') { e.preventDefault(); showSlide(current + 1); }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); showSlide(current - 1); }
+  });
+
+  window.addEventListener('resize', scaleSlides);
+  scaleSlides();
+})();
+</script>
+</body>
+</html>
